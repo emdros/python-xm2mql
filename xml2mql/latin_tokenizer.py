@@ -86,7 +86,7 @@ def tokenize_string(instring):
         surface = "".join(surface_list)
         suffix = "".join(suffix_list)
 
-        result_list.append(prefix, surface, suffix)
+        result_list.append((prefix, surface, suffix))
 
     return result_list
         
