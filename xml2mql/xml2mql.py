@@ -417,13 +417,13 @@ class JSONGeneratorHandler(BaseHandler):
         fout.write(json.dumps(self.script).encode('utf-8'))
 
 class MQLGeneratorHandler(BaseHandler):
-    def __init__(self, json_filename, first_monad, first_id_d):
+    def __init__(self, json_file, first_monad, first_id_d):
         BaseHandler.__init__(self)
 
         self.objstacks = {} # objectTypename -> [object-list]
         self.objects = {} # objectTypeName -> [object-list]
         
-        self.script = json.load(open(json_filename, "rb"))
+        self.script = json.load(json_file)
 
         # objectTypeName -> ObjectTypeDescription
         self.schema = {}
