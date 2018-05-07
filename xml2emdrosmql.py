@@ -29,8 +29,8 @@ COMMANDS
 
 """)
 
-def generateJSON(json_filename_or_file, xml_filesname_list, default_token_name = "token"):
-    handler = xml2mql.JSONGeneratorHandler(default_token_name)
+def generateJSON(json_filename_or_file, xml_filesname_list, default_document_name = "document", default_token_name = "token"):
+    handler = xml2mql.JSONGeneratorHandler(default_document_name, default_token_name)
 
     for filename in xml_filenames:
         fin = open(filename, "rb")
@@ -51,12 +51,12 @@ def generateJSON(json_filename_or_file, xml_filesname_list, default_token_name =
         
     sys.stderr.write("... Done!\n\n")
 
-def generateMQL(json_filename, xml_filenames_list, first_monad, first_id_d, default_token_name = "token"):
+def generateMQL(json_filename, xml_filenames_list, first_monad, first_id_d, defualt_document_name = "document", default_token_name = "token"):
     if json_filename == None or json_filename == "":
         json_file = tempfile.NamedTemporaryFile()
 
         # Generate JSON first...
-        generateJSON(json_file, xml_filenames_list, default_token_name)
+        generateJSON(json_file, xml_filenames_list, default_document_name, default_token_name)
 
         # Rewind file
         json_file.seek(0)
@@ -68,6 +68,7 @@ def generateMQL(json_filename, xml_filenames_list, first_monad, first_id_d, defa
     for filename in xml_filenames_list:
         fin = open(filename, "rb")
         sys.stderr.write("Now reading: %s ...\n" % filename)
+        handler.setBasename(xml2mql.getBasename(filename))
         xml.sax.parse(fin, handler)
         fin.close()
 
@@ -100,11 +101,12 @@ if __name__ == '__main__':
         first_monad = 1
         first_id_d = 1
         default_token_name = "token"
+        default_document_name = "document"
 
         if command == "mql":
-            generateMQL(json_filename, xml_filenames, first_monad, first_id_d, default_token_name)
+            generateMQL(json_filename, xml_filenames, first_monad, first_id_d, default_document_name, default_token_name)
         elif command == "json":
-            generateJSON(json_filename, xml_filenames, default_token_name)
+            generateJSON(json_filename, xml_filenames, default_document_name, default_token_name)
         else:
             usage()
             sys.exit(1)

@@ -35,16 +35,14 @@ emdros_reserved_word_set = set([
     "object",
     "type",
     "list",
-    "index"
+    "index",
+    "sum",
+    "avg",
     ])
     
 
 def getBasename(pathname):
-    filename = pathname.split("/")[-1]
-    if "." in filename:
-        basename = ".".join(filename.split(".")[:-1])
-    else:
-        basename = filename
+    basename = os.path.split(pathname)[-1]
     return basename
 
 
@@ -317,17 +315,22 @@ class BaseHandler(xml.sax.ContentHandler):
         
 
 class JSONGeneratorHandler(BaseHandler):
-    def __init__(self, default_token_name):
+    def __init__(self, default_document_name, default_token_name):
         BaseHandler.__init__(self)
         
         self.bElementHasPCHAR = False
 
+        self.default_document_name = default_document_name
         self.default_token_name = default_token_name
 
         self.element2ObjectTypeName = {}
         self.objectTypeName2Element = {
-            self.default_token_name : "" # Don't use the default token
-                                         # name for elements names...
+            # Don't use the default token
+            # name for elements names...
+            self.default_token_name : "",
+            
+            # Don't use the default document name for elements...            
+            self.default_document_name : "", 
         }
 
         self.init_default_script()
@@ -339,9 +342,10 @@ class JSONGeneratorHandler(BaseHandler):
             "docIndexIncrementBeforeObjectType" : {
                 self.default_token_name : 1,
             },
+            "documentObjectTypeName" : self.default_document_name,
             "tokenObjectTypeNameList" : [
                 self.default_token_name
-            ]
+            ],
         }
         self.script["handled_elements"] = {}
         self.script["ignored_elements"] = []
@@ -387,6 +391,13 @@ class JSONGeneratorHandler(BaseHandler):
             while suggestion in self.objectTypeName2Element and \
                   self.objectTypeName2Element[suggestion] != element_name:
                 suggestion += "_"
+
+            while suggestion == self.default_document_name:
+                suggestion += "_"
+
+            while suggestion in self.script["global_parameters"]["tokenObjectTypeNameList"]:
+                suggestion += "_"
+                
             self.objectTypeName2Element[suggestion] = element_name
             self.element2ObjectTypeName[element_name] = suggestion
 
@@ -464,6 +475,8 @@ class MQLGeneratorHandler(BaseHandler):
     def __init__(self, json_file, first_monad, first_id_d):
         BaseHandler.__init__(self)
 
+        self.basename = None
+
         self.objstacks = {} # objectTypename -> [object-list]
         self.objects = {} # objectTypeName -> [object-list]
         
@@ -490,6 +503,8 @@ class MQLGeneratorHandler(BaseHandler):
 
         self.docIndexFeatureName = self.script["global_parameters"]["docIndexFeatureName"]
 
+        self.documentObjectTypeName = self.script["global_parameters"].get("documentObjectTypeName", "document")
+
         for element_name in self.script["handled_elements"]:
             self.handled_elements.add(element_name)
             
@@ -513,7 +528,9 @@ class MQLGeneratorHandler(BaseHandler):
 
             objectTypeDescription.addFeature(self.docIndexFeatureName, "INTEGER")
             self.schema[tokenObjectTypeName] = objectTypeDescription
-            
+
+        objectTypeDescription = ObjectTypeDescription(self.documentObjectTypeName, "WITH SINGLE RANGE OBJECTS")
+        objectTypeDescription.addFeature("basename", "STRING")
 
         for element_name in self.script["handled_elements"]:
             objectTypeName = self.script["handled_elements"][element_name]["objectTypeName"]
@@ -533,6 +550,9 @@ class MQLGeneratorHandler(BaseHandler):
 
             self.schema[objectTypeName] = objectTypeDescription
 
+    def setBasename(self, basename):
+        self.basename = basename
+            
     def handleChars(self, chars_before, tag, bIsEndTag):
         if not bIsEndTag:
             bDoIt = False
@@ -593,6 +613,15 @@ class MQLGeneratorHandler(BaseHandler):
         else:
             return False
 
+    def startDocument(self):
+        obj = self.createObject(self.documentObjectTypeName)
+        if self.basename != None:
+            obj.setStringFeature("basename", self.basename)
+
+    def endDocument(self):
+        self.endObject(self.documentObjectTypeName)
+        self.basename = None
+        
     def handleElementStart(self, tag, attributes):
         if tag not in self.script["handled_elements"]:
             return False
