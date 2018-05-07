@@ -13,6 +13,7 @@
 #
 import sys
 import os
+import tempfile
 import xml.sax
 
 from xml2mql import xml2mql
@@ -52,10 +53,10 @@ def generateJSON(json_filename_or_file, xml_filesname_list, default_token_name =
 
 def generateMQL(json_filename, xml_filenames_list, first_monad, first_id_d, default_token_name = "token"):
     if json_filename == None or json_filename == "":
-        json_file = os.tmpfile()
+        json_file = tempfile.NamedTemporaryFile()
 
         # Generate JSON first...
-        generateJSON(json_file, xml_filesname_list, default_token_name)
+        generateJSON(json_file, xml_filenames_list, default_token_name)
 
         # Rewind file
         json_file.seek(0)
@@ -64,7 +65,7 @@ def generateMQL(json_filename, xml_filenames_list, first_monad, first_id_d, defa
 
     handler = xml2mql.MQLGeneratorHandler(json_file, first_monad, first_id_d)
 
-    for filename in xml_filenames:
+    for filename in xml_filenames_list:
         fin = open(filename, "rb")
         sys.stderr.write("Now reading: %s ...\n" % filename)
         xml.sax.parse(fin, handler)
