@@ -117,40 +117,6 @@ def mangle_XML_entities(s):
 
 
 
-class Token:
-    def __init__(self, monad, prefix, surface, suffix, xmlindex, id_d):
-        self.monad = monad
-        self.wholesurface = prefix + surface + suffix
-        self.prefix = prefix
-        self.surface = surface
-        self.suffix = suffix
-        self.xmlindex = xmlindex
-        self.id_d = id_d
-
-    def dumpMQL(self, f):
-        surface_lowcase = self.surface.lower();
-
-        result = []
-        result.append("CREATE OBJECT FROM MONADS={%d}" % self.monad)
-
-        if self.id_d != 0:
-            result.append("WITH ID_D=%d" % self.id_d)
-
-        result.append("[")
-        for (featureName, featureValue) in [
-                ("pre", self.prefix),
-                ("surface", self.surface),
-                ("post", self.suffix),
-                ("surface_lowcase", surface_lowcase),
-               ]:
-            result.append("%s:=\"%s\";" % (featureName, mangleMQLString(featureValue)))
-        result.append("xmlindex:=%d;" % self.xmlindex)
-        result.append("]")
-        result.append("")
-
-        str_result = "\n".join(result)
-        f.write(str_result)
-
 
 class SRObject:
     def __init__(self, objectTypeName, starting_monad):
