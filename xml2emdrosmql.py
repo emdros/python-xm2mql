@@ -24,8 +24,9 @@ Usage:
      python3 xml2mql.py command [options] jsonfilename.json [filename.xml...]
 
 COMMANDS
-     json     Generate an example JSON script, put it into jsonfilename.json
-     mql      Generate MQL based on jsonfilename.json
+     json        Generate an example JSON script, put it into jsonfilename.json
+     mql         Generate MQL based on jsonfilename.json
+     renderjson  Generate RenderObjects JSON based on jsonfilename.json
 
 """)
 
@@ -40,7 +41,7 @@ if __name__ == '__main__':
     else:
         command = sys.argv[1]
         
-        if command in ["json", "mql"]:
+        if command in ["json", "mql", "renderjson"]:
             pass
         else:
             usage()
@@ -58,6 +59,8 @@ if __name__ == '__main__':
             xml2mql.generateMQL(json_filename, xml_filenames, first_monad, first_id_d, default_document_name, default_token_name)
         elif command == "json":
             xml2mql.generateJSON(json_filename, xml_filenames, default_document_name, default_token_name)
+        elif command == "renderjson":
+            xml2mql.generateRenderJSON(json_filename, xml_filenames[0])
         else:
             usage()
             sys.exit(1)

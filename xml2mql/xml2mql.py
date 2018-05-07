@@ -19,6 +19,7 @@ import xml.sax
 
 from . import json_generator
 from . import mql_generator
+from . import renderjson_generator
 
 def getBasename(pathname):
     basename = os.path.split(pathname)[-1]
@@ -53,6 +54,22 @@ def generateJSON(json_filename_or_file, xml_filename_list, default_document_name
         
     sys.stderr.write("... Done!\n\n")
 
+    
+def generateRenderJSON(json_filename_or_file, render_json_filename):
+    if type(json_filename_or_file) == type(""):
+        sys.stderr.write("Now reading: JSON file %s ...\n" % json_filename_or_file)
+        fin = open(json_filename_or_file, "rb")
+        handler = renderjson_generator.RenderJSONGeneratorHandler(fin)
+        fin.close()
+    else:
+        sys.stderr.write("Now reading: JSON ...\n")
+        handler = renderjson_generator.RenderJSONGeneratorHandler(json_filename_or_file)
+
+    sys.stderr.write("Now writing: %s...\n" % render_json_filename)
+    handler.doCommand(open(render_json_filename, "wb"))
+    sys.stderr.write("... Done!\n")
+
+    
 def generateMQL(json_filename, xml_filenames_list, first_monad, first_id_d, defualt_document_name = "document", default_token_name = "token"):
     if json_filename == None or json_filename == "":
         json_file = tempfile.NamedTemporaryFile()
