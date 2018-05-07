@@ -34,7 +34,8 @@ emdros_reserved_word_set = set([
     "create",
     "object",
     "type",
-    "list"
+    "list",
+    "index"
     ])
     
 
@@ -139,9 +140,9 @@ class Token:
 
         result.append("[")
         for (featureName, featureValue) in [
-                ("prefix", self.prefix),
+                ("pre", self.prefix),
                 ("surface", self.surface),
-                ("suffix", self.suffix),
+                ("post", self.suffix),
                 ("surface_lowcase", surface_lowcase),
                ]:
             result.append("%s:=\"%s\";" % (featureName, mangleMQLString(featureValue)))
@@ -521,8 +522,8 @@ class MQLGeneratorHandler(BaseHandler):
 
             if "attributes" in self.script["handled_elements"][element_name]:
                 for key in self.script["handled_elements"][element_name]["attributes"]:
-                    featureName = self.script["handled_elements"][element_name]["attributes"][key].get(featureName, "")
-                    featureType = self.script["handled_elements"][element_name]["attributes"][key].get(featureType, "")
+                    featureName = self.script["handled_elements"][element_name]["attributes"][key].get("featureName", "")
+                    featureType = self.script["handled_elements"][element_name]["attributes"][key].get("featureType", "")
 
                     if featureName and featureType:
                         objectTypeDescription.addFeature(featureName, featureType)
