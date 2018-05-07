@@ -17,7 +17,7 @@ import re
 import json
 import xml.sax
 
-import tokenize
+import tokenizer
 
 def usage():
     sys.stderr.write("""
@@ -150,6 +150,10 @@ class SRObject:
         else:
             self.lm = ending_monad
 
+    def getMonadLength(self):
+        return self.lm - self.fm + 1
+
+    
     def dumpMQL(self, fout):
         fout.write("CREATE OBJECT FROM MONADS={%d-%d}" % (self.fm, self.lm))
         if self.id_d != 0:
@@ -423,7 +427,7 @@ class MQLGeneratorHandler(BaseHandler):
         self.objstacks = {} # objectTypename -> [object-list]
         self.objects = {} # objectTypeName -> [object-list]
         
-        self.script = json.load(json_file)
+        self.script = json.loads(b"".join(json_file.readlines()).decode('utf-8'))
 
         # objectTypeName -> ObjectTypeDescription
         self.schema = {}
@@ -446,9 +450,19 @@ class MQLGeneratorHandler(BaseHandler):
 
         self.docIndexFeatureName = self.script["global_parameters"]["docIndexFeatureName"]
 
+        for element_name in self.script["handled_elements"]:
+            self.handled_elements.add(element_name)
+            
+        for element_name in self.script["ignored_elements"]:
+            self.ignored_elements.add(element_name)
+            
+        for element_name in self.script["nixed_elements"]:
+            self.nixed_elements.add(element_name)
+            
+
     def makeSchema(self):
-        for tokenObjectTypeName in self.scripts["global_parameters"]:
-            objectTypeDescription = ObjectTypeDescription(tokenObjectTypeName)
+        for tokenObjectTypeName in self.script["global_parameters"]:
+            objectTypeDescription = ObjectTypeDescription(tokenObjectTypeName, "WITH SINGLE MONAD OBJECTS")
 
             for (featureName, featureType) in [
                     ("pre", "STRING FROM SET"),
@@ -463,12 +477,13 @@ class MQLGeneratorHandler(BaseHandler):
 
         for element_name in self.script["handled_elements"]:
             objectTypeName = self.script["handled_elements"][element_name]["objectTypeName"]
-            objectTypeDescription = ObjectTypeDescription(objectTypeName)
+            objectRangeType = self.script["handled_elements"][element_name].get("objectRangeType", "WITH SINGLE RANGE OBJECTS")
+            objectTypeDescription = ObjectTypeDescription(objectTypeName, objectRangeType)
 
             if "attributes" in self.script["handled_elements"][element_name]:
                 for key in self.script["handled_elements"][element_name]["attributes"]:
-                    featureName = self.script["handled_elements"][element_name]["attributes"][key].getdefault(featureName, "")
-                    featureType = self.script["handled_elements"][element_name]["attributes"][key].getdefault(featureType, "")
+                    featureName = self.script["handled_elements"][element_name]["attributes"][key].get(featureName, "")
+                    featureType = self.script["handled_elements"][element_name]["attributes"][key].get(featureType, "")
 
                     if featureName and featureType:
                         objectTypeDescription.addFeature(featureName, featureType)
@@ -483,7 +498,7 @@ class MQLGeneratorHandler(BaseHandler):
             bDoIt = False
         elif tag not in self.script["handled_elements"]:
             bDoIt = False
-        elif self.script["handled_elements"][tag].getdefault("tokenObjectTypeName", None) != None:
+        elif self.script["handled_elements"][tag].get("tokenObjectTypeName", None) != None:
             bDoIt = True
         else:
             bDoIt = False
@@ -497,7 +512,7 @@ class MQLGeneratorHandler(BaseHandler):
                 self.createToken(tokenObjectTypeName, prefix, surface, suffix)
 
     def createToken(self, tokenObjectTypeName, prefix, surface, suffix):
-        docindex_increment = min(1, self.script["global_parameters"]["docIndexCrementBeforeObjectType"].getdefault(tokenObjectTypeName, 1))
+        docindex_increment = min(1, self.script["global_parameters"]["docIndexCrementBeforeObjectType"].get(tokenObjectTypeName, 1))
         self.curdocindex += docindex_increment
         
         t = Token(self.curmonad, prefix, surface, suffix, self.curdocindex, self.curid_d)
@@ -527,53 +542,54 @@ class MQLGeneratorHandler(BaseHandler):
         
         return obj
 
+    def getFeatureType(self, tag, attribute):
+        assert tag in self.script["handled_elements"], "Logic error: Tag <%s> not in handled elements." % tag
+        assert "attributes" in self.script["handled_elements"][tag], "Logic error: Element %s does not have 'attributes' sub-key, yet getFeatureType() was called." % tag
+        return self.script["handled_elements"][tag]["attributes"][attribute].get("featureType", "STRING")
+
+    def featureTypeIsSTRING(self, featureType):
+        if "string" in featureType.lower():
+            return True
+        else:
+            return False
+
+    def handleElementStart(self, tag, attributes):
+        if tag not in self.script["handled_elements"]:
+            return False
+        else:
+            objectTypeName = self.script["handled_elements"][tag]["objectTypeName"]
+            obj = self.createObject(objectTypeName)
+
+            if "attributes" in self.script["handled_elements"][tag]:
+                for key in self.script["handled_elements"][tag]["attributes"]:
+                    if key in attributes:
+                        value = attributes[key]
+
+                        featureName = self.script["handled_elements"][tag]["attributes"][key]["featureName"]
+                        featureType = self.getFeatureType(tag, key)
+                        if self.featureTypeIsSTRING(featureType):
+                            obj.setStringFeature(featureName, value)
+                        else:
+                            obj.setNonStringFeature(featureName, value)
+
+            return True
+
+    def handleElementEnd(self, tag):
+        if tag not in self.script["handled_elements"]:
+            return False
+        else:
+            objectTypeName = self.script["handled_elements"][tag]["objectTypeName"]
+            obj = self.endObject(objectTypeName)
+
+            minimumMonadLength = self.script["handled_elements"][tag].get("minimumMonadLength", 1)
+            
+            while obj.getMonadLength() < minimumMonadLength:
+                obj.setLastMonad(self.curmonad)
+                self.curmonad += 1
+
+            return True
+
+    
     def doCommand(self, fout):
         # FIXME: Dump MQL
         pass
-
-if len(sys.argv) < 4:
-    usage()
-    sys.exit(1)
-else:
-    command = sys.argv[1]
-
-    if command in ["json", "mql"]:
-        pass
-    else:
-        usage()
-        sys.exit(1)
-        
-    json_filename = sys.argv[2]
-    xml_filenames = sys.argv[3:]
-
-    first_monad = 1
-    first_id_d = 1
-    default_token_name = "token"
-
-    if command == "mql":
-        handler = MQLGeneratorHandler(json_filename, first_monad, first_id_d)
-    elif command == "json":
-        handler = JSONGeneratorHandler(default_token_name)
-    else:
-        usage()
-        sys.exit(1)
-
-    for filename in xml_filenames:
-        fin = open(filename, "rb")
-        sys.stderr.write("Now reading: %s ...\n" % filename)
-        xml.sax.parse(fin, handler)
-        fin.close()
-
-    if command == "mql":
-        handler.doCommand(sys.stdout)
-    elif command == "json":
-        sys.stderr.write("Now writing: %s ...\n" % json_filename)
-
-        fout = open(json_filename, "wb")
-        handler.doCommand(fout)
-        fout.close() 
-
-        sys.stderr.write("... Done!\n\n")
-    else:
-        assert False, "Unhandled command: %s\n" % command
-
