@@ -29,50 +29,6 @@ COMMANDS
 
 """)
 
-def generateJSON(json_filename_or_file, xml_filesname_list, default_document_name = "document", default_token_name = "token"):
-    handler = xml2mql.JSONGeneratorHandler(default_document_name, default_token_name)
-
-    for filename in xml_filenames:
-        fin = open(filename, "rb")
-        sys.stderr.write("Now reading: %s ...\n" % filename)
-        xml.sax.parse(fin, handler)
-        fin.close()
-
-    if type(json_filename_or_file) == type(""):
-        sys.stderr.write("Now writing: %s ...\n" % json_filename_or_file)
-
-        fout = open(json_filename_or_file, "wb")
-        handler.doCommand(fout)
-        fout.close()
-    else:
-        sys.stderr.write("Now writing: JSON ...\n")
-
-        handler.doCommand(json_filename_or_file)
-        
-    sys.stderr.write("... Done!\n\n")
-
-def generateMQL(json_filename, xml_filenames_list, first_monad, first_id_d, defualt_document_name = "document", default_token_name = "token"):
-    if json_filename == None or json_filename == "":
-        json_file = tempfile.NamedTemporaryFile()
-
-        # Generate JSON first...
-        generateJSON(json_file, xml_filenames_list, default_document_name, default_token_name)
-
-        # Rewind file
-        json_file.seek(0)
-    else:
-        json_file = open(json_filename, "rb")
-
-    handler = xml2mql.MQLGeneratorHandler(json_file, sys.stdout, first_monad, first_id_d)
-
-    json_file.close()
-    
-    for filename in xml_filenames_list:
-        fin = open(filename, "rb")
-        sys.stderr.write("Now reading: %s ...\n" % filename)
-        handler.setBasename(xml2mql.getBasename(filename))
-        xml.sax.parse(fin, handler)
-        fin.close()
 
 
     
@@ -99,9 +55,9 @@ if __name__ == '__main__':
         default_document_name = "document"
 
         if command == "mql":
-            generateMQL(json_filename, xml_filenames, first_monad, first_id_d, default_document_name, default_token_name)
+            xml2mql.generateMQL(json_filename, xml_filenames, first_monad, first_id_d, default_document_name, default_token_name)
         elif command == "json":
-            generateJSON(json_filename, xml_filenames, default_document_name, default_token_name)
+            xml2mql.generateJSON(json_filename, xml_filenames, default_document_name, default_token_name)
         else:
             usage()
             sys.exit(1)
