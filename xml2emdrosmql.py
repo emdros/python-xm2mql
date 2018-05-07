@@ -61,7 +61,6 @@ def generateMQL(json_filename, xml_filenames_list, first_monad, first_id_d, defa
         json_file.seek(0)
     else:
         json_file = open(json_filename, "rb")
-        print(repr(json_file))
 
     handler = xml2mql.MQLGeneratorHandler(json_file, first_monad, first_id_d)
 
