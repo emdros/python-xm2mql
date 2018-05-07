@@ -17,7 +17,7 @@ import re
 import json
 import xml.sax
 
-import tokenizer
+from . import latin_tokenizer
 
 def usage():
     sys.stderr.write("""
@@ -504,7 +504,7 @@ class MQLGeneratorHandler(BaseHandler):
             bDoIt = False
             
         if bDoIt:
-            token_list = tokenize.tokenize(chars_before)
+            token_list = latin_tokenizer.tokenize_string(chars_before)
 
             tokenObjectTypeName = self.script["handled_elements"][tag]["tokenObjectTypeName"]
 
@@ -512,7 +512,7 @@ class MQLGeneratorHandler(BaseHandler):
                 self.createToken(tokenObjectTypeName, prefix, surface, suffix)
 
     def createToken(self, tokenObjectTypeName, prefix, surface, suffix):
-        docindex_increment = min(1, self.script["global_parameters"]["docIndexCrementBeforeObjectType"].get(tokenObjectTypeName, 1))
+        docindex_increment = min(1, self.script["global_parameters"]["docIndexIncrementBeforeObjectType"].get(tokenObjectTypeName, 1))
         self.curdocindex += docindex_increment
         
         t = Token(self.curmonad, prefix, surface, suffix, self.curdocindex, self.curid_d)
