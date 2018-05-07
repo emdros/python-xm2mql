@@ -13,7 +13,7 @@
 #
 token_split_chars = " \n\r\t-"
 
-token_non_surface_chars = token_split_chars + ".,;:?\""
+token_non_surface_chars = token_split_chars + ".,;:?\"()[]"
 
 state_after = 0
 state_in = 1
