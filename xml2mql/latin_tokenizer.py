@@ -97,8 +97,6 @@ def tokenize_string(instring):
 
         result_list.append((prefix, surface, suffix))
 
-    print("UP200: " + repr(result_list))
-        
         
     return result_list
         
