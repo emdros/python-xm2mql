@@ -493,15 +493,13 @@ class MQLGeneratorHandler(BaseHandler):
 
         self.docIndexFeatureName = ""
 
-        self.tokens = {}
-
         self.initialize()
 
         self.makeSchema()
 
     def initialize(self):
         for tokenObjectTypeName in self.script["global_parameters"]["tokenObjectTypeNameList"]:
-            self.tokens.setdefault(tokenObjectTypeName, [])
+            self.objects.setdefault(tokenObjectTypeName, [])
 
         self.docIndexFeatureName = self.script["global_parameters"]["docIndexFeatureName"]
 
@@ -533,6 +531,7 @@ class MQLGeneratorHandler(BaseHandler):
 
         objectTypeDescription = ObjectTypeDescription(self.documentObjectTypeName, "WITH SINGLE RANGE OBJECTS")
         objectTypeDescription.addFeature("basename", "STRING")
+        objectTypeDescription.addFeature(self.docIndexFeatureName, "INTEGER")
         self.schema[self.documentObjectTypeName] = objectTypeDescription
 
         for element_name in self.script["handled_elements"]:
@@ -577,17 +576,25 @@ class MQLGeneratorHandler(BaseHandler):
     def createToken(self, tokenObjectTypeName, prefix, surface, suffix):
         docindex_increment = min(1, self.script["global_parameters"]["docIndexIncrementBeforeObjectType"].get(tokenObjectTypeName, 1))
         self.curdocindex += docindex_increment
-        
-        t = Token(self.curmonad, prefix, surface, suffix, self.curdocindex, self.curid_d)
+
+        surface_lowcase = surface.lower()
+
+        t = self.createObject(tokenObjectTypeName)
+        t.setStringFeature("pre", prefix)
+        t.setStringFeature("surface", surface)
+        t.setStringFeature("post", suffix)
+        t.setStringFeature("surface_lowcase", surface_lowcase)
+
+        t.setID_D(self.curid_d)
+        self.curid_d += 1
 
         self.curmonad += 1
-        self.curid_d += 1
-        self.curdocindex += 1
-
-        self.tokens[tokenObjectTypeName].append(t)
 
     def createObject(self, objectTypeName):
         obj = SRObject(objectTypeName, self.curmonad)
+        obj.setID_D(self.curid_d)
+        self.curid_d += 1
+        
         obj.setNonStringFeature(self.docIndexFeatureName, self.curdocindex)
         self.curdocindex += 1
 
@@ -680,23 +687,11 @@ class MQLGeneratorHandler(BaseHandler):
             objectTypeDescription.dumpMQL(fout)
     
     def dumpMQLObjects(self, fout):
-        # Non-tokens
         for objectTypeName in sorted(self.objects):
             self.dumpMQLObjectType(fout, objectTypeName, self.objects[objectTypeName])
 
         del self.objects
         self.objects = {}
-
-
-        # Tokens
-        for objectTypeName in sorted(self.tokens):
-            self.dumpMQLObjectType(fout, objectTypeName, self.tokens[objectTypeName])
-
-        del self.tokens
-        self.tokens = {}
-        for tokenObjectTypeName in self.script["global_parameters"]["tokenObjectTypeNameList"]:
-            self.tokens.setdefault(tokenObjectTypeName, [])
-        
 
 
 
