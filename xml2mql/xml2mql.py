@@ -56,8 +56,22 @@ class ObjectTypeDescription:
         self.features[featureName] = featureType
 
     def dumpMQL(self, fout):
-        assert False, "FIXME: Implement"
-        pass
+        result = []
+
+        result.append("CREATE OBJECT TYPE")
+        result.append(self.objectRangeType)
+        result.append("[")
+        for featureName in sorted(self.features):
+            featureType = self.features[featureName];
+            result.append("  %s : %s;" % (featureType, featureName))
+        result.append("]")
+        result.append("GO")
+
+
+        result.append("")
+        result.append("")
+
+        fout.write("\n".join(result))
     
 
 ########################################
@@ -65,13 +79,13 @@ class ObjectTypeDescription:
 ## MQL string mangling
 ##
 ########################################
-special_re = re.compile(r"[\n\t\"\\]")
+special_re = re.compile(rb"[\n\t\"\\]")
 
 special_dict = {
-    '\n' : '\\n',
-    '\t' : '\\t',
-    '"' : '\\"',
-    '\\' : '\\\\',
+    b'\n' : b'\\n',
+    b'\t' : b'\\t',
+    b'"' : b'\\"',
+    b'\\' : b'\\\\',
 }
 
 upper_bit_re = re.compile(b'[\x80-\xff]')
@@ -84,7 +98,7 @@ def special_sub(mo):
 def upper_bit_sub(mo):
     c = mo.group(0)
     assert len(c) == 1
-    return "\\x%02x" % ord(c)
+    return b"\\x%02x" % ord(c)
 
 def mangleMQLString(ustr):
     result = special_re.sub(special_sub, ustr.encode('utf-8'))
@@ -114,13 +128,23 @@ class Token:
 
     def dumpMQL(self, f):
         surface_lowcase = self.surface.lower();
-        surface_stripped_lowcase = surface_re.findall(surface_lowcase)[0][1]
+
+        result = []
 
         f.write("CREATE OBJECT FROM MONADS={%d}\n" % self.monad)
         if self.id_d != 0:
             f.write("WITH ID_D=%d\n" % self.id_d)
-        f.write(("[surface_stripped_lowcase:=\"%s\";\n" % (mangleMQLString(surface_stripped_lowcase))).encode('utf-8'))
-        f.write(("wholesurface:=\"%s\";xmlindex:=%d;\n]\n" % (mangleMQLString(self.wholesurface), self.xmlindex)).encode('utf-8'))
+
+        f.write("[")
+        for (featureName, featureValue) in [
+                ("prefix", self.prefix),
+                ("surface", self.surface),
+                ("suffix", self.suffix),
+                ("surface_lowcase", surface_lowcase),
+               ]:
+            f.write("%s:\"%s\";\n" % (featureName, mangleMQLString(featureValue)))
+        f.write("xmlindex:=%d;\n" % self.xmlindex)
+        f.write("]\n")
 
 
 class SRObject:
@@ -160,9 +184,9 @@ class SRObject:
             fout.write("WITH ID_D=%d" % self.id_d)
         fout.write("[")
         for (key,value) in self.nonStringFeatures.items():
-            print >>fout, "  %s:=%s;" % (key, value)
+            fout.write("  %s:=%s;\n" % (key, value))
         for (key,value) in self.stringFeatures.items():
-            print >>fout, ("  %s:=\"%s\";" % (key, mangleMQLString(value))).encode('utf-8')
+            fout.write("  %s:=\"%s\";\n" % (key, mangleMQLString(value)))
         fout.write("]\n")
 
 class BaseHandler(xml.sax.ContentHandler):
@@ -275,8 +299,6 @@ class BaseHandler(xml.sax.ContentHandler):
         
     def doCommand(self, fout):
         pass
-
-        
         
 
 class JSONGeneratorHandler(BaseHandler):
@@ -591,5 +613,40 @@ class MQLGeneratorHandler(BaseHandler):
 
     
     def doCommand(self, fout):
-        # FIXME: Dump MQL
-        pass
+        fout.write("""//
+// Dumped with xml2emdrosmql.py.
+//
+
+""")
+        self.dumpMQLSchema(fout)
+
+        self.dumpMQLObjects(fout)
+
+    def dumpMQLSchema(self, fout):
+        for objectTypeName in sorted(self.schema):
+            objectTypeDescription = self.schema[objectTypeName]
+            objectTypeDescription.dumpMQL(fout)
+    
+    def dumpMQLObjects(self, fout):
+        for objectTypeName in sorted(self.objects):
+            self.dumpMQLObjectType(fout, objectTypeName, self.objects[objectTypeName])
+
+        for objectTypeName in sorted(self.tokens):
+            self.dumpMQLObjectType(fout, objectTypeName, self.tokens[objectTypeName])
+
+    def dumpMQLObjectType(self, fout, objectTypeName, object_list):
+        max_in_statement = 50000
+
+        fout.write("CREATE OBJECTS WITH OBJECT TYPE [%s]\n" % objectTypeName)
+
+        count = 0
+        for obj in object_list:
+            count += 1
+            if count == max_in_statement:
+                fout.write("GO\n")
+                fout.write("CREATE OBJECTS WITH OBJECT TYPE [%s]\n" % objectTypeName)
+                count = 0
+            obj.dumpMQL(fout)
+
+
+        fout.write("GO")
