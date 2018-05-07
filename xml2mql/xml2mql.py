@@ -472,15 +472,17 @@ class JSONGeneratorHandler(BaseHandler):
         fout.write(json.dumps(self.script).encode('utf-8'))
 
 class MQLGeneratorHandler(BaseHandler):
-    def __init__(self, json_file, first_monad, first_id_d):
+    def __init__(self, json_file, mql_file, first_monad, first_id_d):
         BaseHandler.__init__(self)
 
+        self.bSchemaHasBeenDumped = False
         self.basename = None
 
         self.objstacks = {} # objectTypename -> [object-list]
         self.objects = {} # objectTypeName -> [object-list]
         
         self.script = json.loads(b"".join(json_file.readlines()).decode('utf-8'))
+        self.mql_file = mql_file
 
         # objectTypeName -> ObjectTypeDescription
         self.schema = {}
@@ -531,6 +533,7 @@ class MQLGeneratorHandler(BaseHandler):
 
         objectTypeDescription = ObjectTypeDescription(self.documentObjectTypeName, "WITH SINGLE RANGE OBJECTS")
         objectTypeDescription.addFeature("basename", "STRING")
+        self.schema[self.documentObjectTypeName] = objectTypeDescription
 
         for element_name in self.script["handled_elements"]:
             objectTypeName = self.script["handled_elements"][element_name]["objectTypeName"]
@@ -621,6 +624,18 @@ class MQLGeneratorHandler(BaseHandler):
     def endDocument(self):
         self.endObject(self.documentObjectTypeName)
         self.basename = None
+
+        if not self.bSchemaHasBeenDumped:
+            self.mql_file.write("""//
+// Dumped with xml2emdrosmql.py.
+//
+
+""")
+            self.dumpMQLSchema(self.mql_file)
+            self.bSchemaHasBeenDumped = True
+
+        self.dumpMQLObjects(self.mql_file)
+            
         
     def handleElementStart(self, tag, attributes):
         if tag not in self.script["handled_elements"]:
@@ -659,29 +674,36 @@ class MQLGeneratorHandler(BaseHandler):
             return True
 
     
-    def doCommand(self, fout):
-        fout.write("""//
-// Dumped with xml2emdrosmql.py.
-//
-
-""")
-        self.dumpMQLSchema(fout)
-
-        self.dumpMQLObjects(fout)
-
     def dumpMQLSchema(self, fout):
         for objectTypeName in sorted(self.schema):
             objectTypeDescription = self.schema[objectTypeName]
             objectTypeDescription.dumpMQL(fout)
     
     def dumpMQLObjects(self, fout):
+        # Non-tokens
         for objectTypeName in sorted(self.objects):
             self.dumpMQLObjectType(fout, objectTypeName, self.objects[objectTypeName])
 
+        del self.objects
+        self.objects = {}
+
+
+        # Tokens
         for objectTypeName in sorted(self.tokens):
             self.dumpMQLObjectType(fout, objectTypeName, self.tokens[objectTypeName])
 
+        del self.tokens
+        self.tokens = {}
+        for tokenObjectTypeName in self.script["global_parameters"]["tokenObjectTypeNameList"]:
+            self.tokens.setdefault(tokenObjectTypeName, [])
+        
+
+
+
     def dumpMQLObjectType(self, fout, objectTypeName, object_list):
+        if len(object_list) == 0:
+            return
+        
         max_in_statement = 50000
 
         fout.write("CREATE OBJECTS WITH OBJECT TYPE [%s]\n" % objectTypeName)

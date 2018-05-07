@@ -63,8 +63,10 @@ def generateMQL(json_filename, xml_filenames_list, first_monad, first_id_d, defu
     else:
         json_file = open(json_filename, "rb")
 
-    handler = xml2mql.MQLGeneratorHandler(json_file, first_monad, first_id_d)
+    handler = xml2mql.MQLGeneratorHandler(json_file, sys.stdout, first_monad, first_id_d)
 
+    json_file.close()
+    
     for filename in xml_filenames_list:
         fin = open(filename, "rb")
         sys.stderr.write("Now reading: %s ...\n" % filename)
@@ -72,13 +74,6 @@ def generateMQL(json_filename, xml_filenames_list, first_monad, first_id_d, defu
         xml.sax.parse(fin, handler)
         fin.close()
 
-
-    # Dump MQL on stdout
-    handler.doCommand(sys.stdout)
-        
-
-
-    json_file.close()
 
     
 
