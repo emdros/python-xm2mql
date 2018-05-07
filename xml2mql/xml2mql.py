@@ -79,30 +79,24 @@ class ObjectTypeDescription:
 ## MQL string mangling
 ##
 ########################################
-special_re = re.compile(rb"[\n\t\"\\]")
+special_re = re.compile(r"[\n\t\"\\]")
 
 special_dict = {
-    b'\n' : b'\\n',
-    b'\t' : b'\\t',
-    b'"' : b'\\"',
-    b'\\' : b'\\\\',
+    '\n' : '\\n',
+    '\t' : '\\t',
+    '"' : '\\"',
+    '\\' : '\\\\',
 }
 
-upper_bit_re = re.compile(b'[\x80-\xff]')
 
 def special_sub(mo):
     c = mo.group(0)
     assert len(c) == 1
     return special_dict[c]
 
-def upper_bit_sub(mo):
-    c = mo.group(0)
-    assert len(c) == 1
-    return b"\\x%02x" % ord(c)
 
 def mangleMQLString(ustr):
-    result = special_re.sub(special_sub, ustr.encode('utf-8'))
-    result = upper_bit_re.sub(upper_bit_sub, result)
+    result = special_re.sub(special_sub, ustr)
     return result
 
     
