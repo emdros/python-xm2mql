@@ -30,6 +30,13 @@ COMMANDS
 
 """)
 
+emdros_reserved_word_set = set([
+    "create",
+    "object",
+    "type",
+    "list"
+    ])
+    
 
 def getBasename(pathname):
     filename = pathname.split("/")[-1]
@@ -60,10 +67,10 @@ class ObjectTypeDescription:
 
         result.append("CREATE OBJECT TYPE")
         result.append(self.objectRangeType)
-        result.append("[")
+        result.append("[%s" % self.objectTypeName)
         for featureName in sorted(self.features):
             featureType = self.features[featureName];
-            result.append("  %s : %s;" % (featureType, featureName))
+            result.append("  %s : %s;" % (featureName, featureType))
         result.append("]")
         result.append("GO")
 
@@ -79,9 +86,10 @@ class ObjectTypeDescription:
 ## MQL string mangling
 ##
 ########################################
-special_re = re.compile(r"[\n\t\"\\]")
+special_re = re.compile(r"[\r\n\t\"\\]")
 
 special_dict = {
+    '\r' : '\\r',
     '\n' : '\\n',
     '\t' : '\\t',
     '"' : '\\"',
@@ -124,21 +132,25 @@ class Token:
         surface_lowcase = self.surface.lower();
 
         result = []
+        result.append("CREATE OBJECT FROM MONADS={%d}" % self.monad)
 
-        f.write("CREATE OBJECT FROM MONADS={%d}\n" % self.monad)
         if self.id_d != 0:
-            f.write("WITH ID_D=%d\n" % self.id_d)
+            result.append("WITH ID_D=%d" % self.id_d)
 
-        f.write("[")
+        result.append("[")
         for (featureName, featureValue) in [
                 ("prefix", self.prefix),
                 ("surface", self.surface),
                 ("suffix", self.suffix),
                 ("surface_lowcase", surface_lowcase),
                ]:
-            f.write("%s:\"%s\";\n" % (featureName, mangleMQLString(featureValue)))
-        f.write("xmlindex:=%d;\n" % self.xmlindex)
-        f.write("]\n")
+            result.append("%s:=\"%s\";" % (featureName, mangleMQLString(featureValue)))
+        result.append("xmlindex:=%d;" % self.xmlindex)
+        result.append("]")
+        result.append("")
+
+        str_result = "\n".join(result)
+        f.write(str_result)
 
 
 class SRObject:
@@ -173,16 +185,24 @@ class SRObject:
 
     
     def dumpMQL(self, fout):
-        fout.write("CREATE OBJECT FROM MONADS={%d-%d}" % (self.fm, self.lm))
+        result = []
+        if self.fm == self.lm:
+            result.append("CREATE OBJECT FROM MONADS={%d}" % self.fm)
+        else:
+            result.append("CREATE OBJECT FROM MONADS={%d-%d}" % (self.fm, self.lm))
         if self.id_d != 0:
-            fout.write("WITH ID_D=%d" % self.id_d)
-        fout.write("[")
+            result.append("WITH ID_D=%d" % self.id_d)
+        result.append("[")
         for (key,value) in self.nonStringFeatures.items():
-            fout.write("  %s:=%s;\n" % (key, value))
+            result.append("  %s:=%s;" % (key, value))
         for (key,value) in self.stringFeatures.items():
-            fout.write("  %s:=\"%s\";\n" % (key, mangleMQLString(value)))
-        fout.write("]\n")
+            result.append("  %s:=\"%s\";" % (key, mangleMQLString(value)))
+        result.append("]")
+        result.append("")
 
+        str_result = "\n".join(result)
+        fout.write(str_result)
+        
 class BaseHandler(xml.sax.ContentHandler):
     def __init__(self):
         self.elemstack = []
@@ -399,9 +419,12 @@ class JSONGeneratorHandler(BaseHandler):
 
         # Identifiers are case-insensitive, so lower-case the string
         # for uniformity.
-        real_result = "".join(result).lower()
+        suggestion = "".join(result).lower()
 
-        return real_result
+        if suggestion in emdros_reserved_word_set:
+            suggestion += "_"
+
+        return suggestion
 
     def updateTokenObjectTypeName(self, element_name):
         if element_name in self.script["handled_elements"]:
@@ -477,7 +500,7 @@ class MQLGeneratorHandler(BaseHandler):
             
 
     def makeSchema(self):
-        for tokenObjectTypeName in self.script["global_parameters"]:
+        for tokenObjectTypeName in self.script["global_parameters"]["tokenObjectTypeNameList"]:
             objectTypeDescription = ObjectTypeDescription(tokenObjectTypeName, "WITH SINGLE MONAD OBJECTS")
 
             for (featureName, featureType) in [
@@ -643,4 +666,6 @@ class MQLGeneratorHandler(BaseHandler):
             obj.dumpMQL(fout)
 
 
-        fout.write("GO")
+        fout.write("GO\n")
+
+        
