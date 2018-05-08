@@ -153,6 +153,8 @@ class MQLGeneratorHandler(BaseHandler):
 
         self.curmonad += 1
 
+        self.endObject(tokenObjectTypeName)
+
     def createObject(self, objectTypeName):
         obj = emdros_util.SRObject(objectTypeName, self.curmonad)
         obj.setID_D(self.curid_d)
